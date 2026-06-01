@@ -15,14 +15,14 @@ def extract_hog_features(image_path):
     if img is None:
         raise ValueError(f"Could not read image: {image_path}")
     
-    # blur image so it has less noise
+    # blur image so it has less noise (with kernel size 3)
     img = cv2.medianBlur(img, 3)
     # HOG feature vector
     # orientations = 9 reprezinta 9 bucati pt unghiurile care ocupa 180 de grade (fiecare bucata reprezinta un slice de 20 de grade)
-    # pixels_per_cell=(8, 8) inseamna ca imaginea e structurata in 8x8 patrate de pixeli 
+    # pixels_per_cell=(8, 8) inseamna ca imaginea e structurata in 8x8 patrate de pixeli
     # cells_per_block=(2, 2) grupeaza in 2x2 grid (16x16 pixeli) pt normalizare
     # block_norm='L2-Hys' e formula matematica folosita pentru normalizare; limiteaza valorile maxime pentru a nu avea edge uri prea luminoase 
-    features = hog(img, orientations=9, pixels_per_cell=(8, 8),
+    features = hog(img, orientations=9, pixels_per_cell=(4, 4),
                    cells_per_block=(2, 2), block_norm='L2-Hys', visualize=False)
     return features
 
@@ -55,8 +55,8 @@ if __name__ == "__main__":
     
     print("Training SVM Classifier")
     # C = regularization parameter
-    # 1.0 default. 
-    svm_model = SVC(kernel='rbf', C=1.0, random_state=42) 
+    # C = 10 can overfit 
+    svm_model = SVC(kernel='rbf', C=10.0, random_state=42) 
     svm_model.fit(X_train, y_train)
     
     print("Predicting on validation set...")
@@ -74,34 +74,25 @@ if __name__ == "__main__":
     plt.ylabel('True Label')
     plt.savefig('confusion_matrix_baseline.png') 
 
-    # ---------------------------------------------------------
-    # 7. Generate Submission File for the Leaderboard
-    # ---------------------------------------------------------
     print("Generating predictions for the test set...")
     test_csv = 'data/test.csv'
     test_dir = 'data/test/'
-    
-    # Load test data
     test_df = pd.read_csv(test_csv)
     X_test = []
     
-    # Extract features for test images
+    # take features for test images
     for index, row in test_df.iterrows():
         img_path = os.path.join(test_dir, str(row['id']))
         features = extract_hog_features(img_path)
         X_test.append(features)
         
     X_test = np.array(X_test)
-    
-    # Predict using the trained SVM
+
     test_predictions = svm_model.predict(X_test)
-    
-    # Format the submission
+    # format the submission
     submission_df = pd.DataFrame({
         'id': test_df['id'],
         'label': test_predictions
     })
-    
-    # Save to CSV without the pandas index column (Mandatory for most formats)
-    submission_df.to_csv('submission_baseline.csv', index=False)
-    print("Submission file saved as 'submission_baseline.csv'. You can now upload this to the leaderboard!")
+    submission_df.to_csv('submission_baseline.csv', index=False) # save without pandas index  
+    print("Submission file saved as 'submission_baseline.csv'")
